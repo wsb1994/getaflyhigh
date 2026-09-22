@@ -398,7 +398,7 @@ function makeBlunt(len=.55, r=.045){
   const light = new THREE.PointLight(0xff5a10, .4, 2, 2); light.position.copy(ember.position); g.add(light);
   g.userData = { ember, light }; return g;
 }
-const pipe = makeBlunt(.7, .065);                // the fly's
+const pipe = makeBlunt(.52, .06);                // the fly's
 const bowl = pipe.userData.ember, ember = pipe.userData.ember, emberLight = pipe.userData.light;
 fly.add(pipe);
 function placeBlunt(){ pipe.position.copy(mouthLocal); aimBlunt(0); }
