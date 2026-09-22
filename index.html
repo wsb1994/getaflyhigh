@@ -279,18 +279,18 @@ new GLTFLoader().load('assets/room.glb', (g) => {
 });
 
 // posters on the back wall (canvas textures, drawn small so they stay crunchy)
-function posterTex(lines, bg, fg, w=64, h=96){
+function posterTex(lines, bg, fg, w=96, h=144){
   const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   g.fillStyle = bg; g.fillRect(0,0,w,h); g.strokeStyle = fg; g.lineWidth = 2; g.strokeRect(2,2,w-4,h-4);
   g.fillStyle = fg; g.font = 'bold 15px Impact, "Arial Black", sans-serif'; g.textAlign = 'center';
-  lines.forEach((l,i) => g.fillText(l, w/2, 28 + i*22));
+  lines.forEach((l,i) => { g.font = `bold ${l.length > 6 ? 17 : 24}px Impact, "Arial Black", sans-serif`; g.fillText(l, w/2, 40 + i*34); });   // long words drop a size so they fit the poster
   const t = new THREE.CanvasTexture(c); return pixelTex(t);
 }
 function hangPosters(){
   // back wall is at kit y=+2.5 -> three z = -2.5*ROOM_S; walls face -z
   const specs = [
     [-1.6, [ 'WEST', 'SIDE', '★' ], '#1b0a2a', '#e8d27a'],
-    [ 0.2, [ 'DOGGY', 'STYLE', '1993' ], '#0d2a14', '#9fe07a'],
+    [ 0.2, [ 'TEAM', 'SESH', 'DEADBOYS' ], '#0a0a0a', '#e8e8e8'],
     [ 1.4, [ 'G', 'FUNK', 'ERA' ], '#2a0d1a', '#ff7ac8'],
   ];
   for (const [x, lines, bg, fg] of specs) {
@@ -298,7 +298,7 @@ function hangPosters(){
     p.position.set(x*ROOM_S, 1.75*ROOM_S, -2.5*ROOM_S + .1); scene.add(p);
   }
   // a poster of the lowrider on the left wall, facing +x
-  const lp = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['LOW', 'RIDER'], '#101a3a', '#ffd25a', 96, 64) })));
+  const lp = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['LOW', 'RIDER'], '#101a3a', '#ffd25a', 144, 96) })));
   lp.rotation.y = Math.PI/2; lp.position.set(-3*ROOM_S + .1, 1.8*ROOM_S, 1.2*ROOM_S); scene.add(lp);
 }
 
