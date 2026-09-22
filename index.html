@@ -335,8 +335,8 @@ zune.position.set(1.0, 0.37*ROOM_S + .16, -0.55*ROOM_S); zune.rotation.y = -.5; 
 
 // ---------- THE FLY (sculpted model, assets/fly.glb) ----------
 const fly = new THREE.Group();
-const FLY_Y = 0.41*ROOM_S;              // couch seat height
-fly.position.set(-0.45*ROOM_S, FLY_Y, -1.55*ROOM_S); fly.rotation.y = 1.35; scene.add(fly);
+const FLY_Y = 0.41*ROOM_S + .05;        // couch seat height, leg tips resting on the cushion
+fly.position.set(-0.4*ROOM_S, FLY_Y, -1.52*ROOM_S); fly.rotation.y = 1.35; scene.add(fly);
 let eyeMat = null, wingMesh = null, headMesh = null;
 const headLocal = new THREE.Vector3(0, .55, .8);     // updated from the eye mesh once loaded
 const mouthLocal = new THREE.Vector3(0, .3, .9);
@@ -344,7 +344,7 @@ const flyBytes = Uint8Array.from(atob(window.FLY_GLB_B64), ch => ch.charCodeAt(0
 new GLTFLoader().parse(flyBytes, '', (g) => {
   const m = g.scene;
   const box = new THREE.Box3().setFromObject(m); const size = box.getSize(new THREE.Vector3());
-  const s = 2.2 / Math.max(size.x, size.y, size.z); m.scale.setScalar(s);
+  const s = 1.7 / Math.max(size.x, size.y, size.z); m.scale.setScalar(s);
   box.setFromObject(m); m.position.y -= box.min.y;                     // stand on the cushion
   m.updateMatrixWorld(true);
   m.traverse(o => {
