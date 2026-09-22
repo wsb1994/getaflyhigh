@@ -290,7 +290,6 @@ function posterTex(lines, bg, fg, w=96, h=144){
 function hangPosters(){
   // back wall is at kit y=+2.5 -> three z = -2.5*ROOM_S; walls face -z
   const specs = [
-    [-1.6, [ 'DEER', 'GOD', '🦌' ], '#0a0a0a', '#d8d8d8'],
     [ 0.2, [ 'TEAM', 'SESH', 'DEADBOYS' ], '#0a0a0a', '#e8e8e8'],
     [ 1.4, [ 'EDDY', 'BAKER', '☠' ], '#101010', '#c8c8c8'],
   ];
@@ -301,12 +300,14 @@ function hangPosters(){
   // a poster of the lowrider on the left wall, facing +x
   const lp = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['SESH', 'HOLD'], '#0a0a0a', '#e0e0e0', 144, 96) })));
   lp.rotation.y = Math.PI/2; lp.position.set(-3*ROOM_S + .1, 1.8*ROOM_S, 1.2*ROOM_S); scene.add(lp);
-  // a video still on the left wall, facing into the room
+  const dg = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['DEER', 'GOD', '🦌'], '#0a0a0a', '#d8d8d8') })));
+  dg.rotation.y = Math.PI/2; dg.position.set(-3*ROOM_S + .1, 1.75*ROOM_S, 0.1*ROOM_S); scene.add(dg);
+  // the album still on the back wall, facing the camera
   new THREE.TextureLoader().load('assets/poster_yt.png', (t) => {
     const yp = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.46), psxify(new THREE.MeshLambertMaterial({ map: pixelTex(t) })));
-    yp.rotation.y = Math.PI/2; yp.position.set(-3*ROOM_S + .12, 1.75*ROOM_S, 0.1*ROOM_S); scene.add(yp);   // left wall, beside the Sesh Hold poster
+    yp.position.set(-2.15*ROOM_S, 1.22*ROOM_S, -2.5*ROOM_S + .1); scene.add(yp);   // back wall, left of the bookshelf
     const frame = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.66), psxify(new THREE.MeshLambertMaterial({ color: 0xe8e8e8 })));
-    frame.rotation.y = Math.PI/2; frame.position.copy(yp.position); frame.position.x -= .02; scene.add(frame);
+    frame.position.copy(yp.position); frame.position.z -= .02; scene.add(frame);
   });
 }
 
@@ -315,7 +316,7 @@ scene.add(new THREE.AmbientLight(0x7a5a8a, 2.2));
 scene.add(new THREE.HemisphereLight(0x9a6ac0, 0x2a1418, 1.6));
 const ceilLight = new THREE.PointLight(0xffc890, 160, 40, 2); ceilLight.position.set(0, 7.2, -3); scene.add(ceilLight);
 const couchLight = new THREE.PointLight(0xffd0a0, 40, 14, 2); couchLight.position.set(-1.5, 4.0, -1.5); scene.add(couchLight);
-const lavaLight = new THREE.PointLight(0xd040e0, 25, 12, 2); lavaLight.position.set(-2.3*ROOM_S, 2.2, -2.0*ROOM_S); scene.add(lavaLight);
+const lavaLight = new THREE.PointLight(0xd040e0, 25, 12, 2); lavaLight.position.set(-2.55*ROOM_S, 2.2, -1.2*ROOM_S); scene.add(lavaLight);
 const tvLight = new THREE.PointLight(0x4080ff, 12, 9, 2); tvLight.position.set(-2.2*ROOM_S, 1.9, 0.6*ROOM_S); scene.add(tvLight);
 const fillLight = new THREE.PointLight(0xffb070, 30, 14, 2); fillLight.position.set(3.5, 3.6, 2.5); scene.add(fillLight);
 const rimLight = new THREE.PointLight(0x8a5aff, 10, 12, 2); rimLight.position.set(-2.5, 3.5, -5.5); scene.add(rimLight);
@@ -389,20 +390,28 @@ new GLTFLoader().parse(flyBytes, '', (g) => {
 // the blunt: a fat hand-rolled cone at the fly's mouth, cherry at the far end
 function makeBlunt(len=.55, r=.045){
   const g = new THREE.Group();
-  const paper = new THREE.Mesh(new THREE.CylinderGeometry(r, r*.7, len, 8), psxify(new THREE.MeshLambertMaterial({ color:0x6b4a2a })));
+  const paper = new THREE.Mesh(new THREE.CylinderGeometry(r, r*.7, len, 8), psxify(new THREE.MeshLambertMaterial({ color:0xd2a86a, emissive:0x5a3c18 })));
   paper.rotation.z = Math.PI/2; paper.position.x = len/2; g.add(paper);
-  const ash = new THREE.Mesh(new THREE.CylinderGeometry(r*.95, r*.85, len*.12, 8), psxify(new THREE.MeshLambertMaterial({ color:0x8a8a86 })));
+  const ash = new THREE.Mesh(new THREE.CylinderGeometry(r*.95, r*.85, len*.12, 8), psxify(new THREE.MeshLambertMaterial({ color:0xbdbdb8, emissive:0x333330 })));
   ash.rotation.z = Math.PI/2; ash.position.x = len*1.0; g.add(ash);
-  const ember = new THREE.Mesh(new THREE.SphereGeometry(r*.9, 8, 6), new THREE.MeshBasicMaterial({ color:0xff6a10 })); ember.position.x = len*1.08; g.add(ember);
+  const ember = new THREE.Mesh(new THREE.SphereGeometry(r*1.05, 8, 6), new THREE.MeshBasicMaterial({ color:0xff7a20 })); ember.position.x = len*1.08; g.add(ember);
   const light = new THREE.PointLight(0xff5a10, .4, 2, 2); light.position.copy(ember.position); g.add(light);
   g.userData = { ember, light }; return g;
 }
-const pipe = makeBlunt(.5, .04);                 // the fly's
+const pipe = makeBlunt(.7, .065);                // the fly's
 const bowl = pipe.userData.ember, ember = pipe.userData.ember, emberLight = pipe.userData.light;
 fly.add(pipe);
-function placeBlunt(){ pipe.position.copy(mouthLocal); pipe.rotation.set(0, .55, -.15); }
+function placeBlunt(){ pipe.position.copy(mouthLocal); aimBlunt(0); }
+const X_AXIS = new THREE.Vector3(1,0,0), aimW = new THREE.Vector3(), camFwd = new THREE.Vector3(), camRight = new THREE.Vector3(), flyQ = new THREE.Quaternion();
+function aimBlunt(drag){
+  // the blunt droops from the mouth: out to the viewer's right, a bit toward them, lit tip angled down
+  camera.getWorldDirection(camFwd); camRight.crossVectors(camFwd, camera.up).normalize();
+  aimW.copy(camRight).multiplyScalar(.75).addScaledVector(camFwd, -.3 + drag*.2).addScaledVector(camera.up, -.45 + drag*.3).normalize();
+  fly.getWorldQuaternion(flyQ).invert(); aimW.applyQuaternion(flyQ);
+  pipe.quaternion.setFromUnitVectors(X_AXIS, aimW);
+}
 // CJ's blunt sits in his raised hand; the empty from Blender marks the hand
-const cjBlunt = makeBlunt(.34, .03); cjBlunt.visible = false; scene.add(cjBlunt);
+const cjBlunt = makeBlunt(.42, .04); cjBlunt.visible = false; scene.add(cjBlunt);
 const cjHandW = new THREE.Vector3(), cjMouthW = new THREE.Vector3(), cjEmberW = new THREE.Vector3();
 // cans over the eyes, so the fly is listening rather than being wired up
 function addCans(){
@@ -593,14 +602,14 @@ function animate(){
   const sq = SEQ_FREEZE >= 0 ? SEQ_FREEZE : t - seqStart;   // ?seq=1.8 holds the choreography at that second, for screenshots
   const flyDrag = bump(sq, 0, 1.2), flyExhale = bump(sq, 1.1, 2.4);
   const cjDrag = bump(sq, 2.3, 3.6), cjExhale = bump(sq, 3.5, 5.0);
-  pipe.rotation.set(0, .55 + flyDrag*.6, -.15 - flyDrag*.35);
-  pipe.position.copy(mouthLocal); pipe.position.x -= flyDrag*.05; pipe.position.y += flyDrag*.03;
+  aimBlunt(flyDrag);
+  pipe.position.copy(mouthLocal); pipe.position.y += flyDrag*.03;
   fly.rotation.x += flyDrag*.12 - flyExhale*.1;            // lean into the drag, tip back on the exhale
   fly.position.y += flyExhale*.05;
   ember.material.color.setHSL(.05, 1, .35 + torch*.3 + flyDrag*.3);
   emberLight.intensity = .4 + torch*2.5 + flyDrag*4;
-  if (flyExhale > 0) for (let k=0; k<flyExhale*5; k++)
-    emit(smoke, mouthWorld.x, mouthWorld.y, mouthWorld.z, (Math.random()-.5)*.15 + .25*flyExhale, .18+Math.random()*.2, (Math.random()-.5)*.15 + .35*flyExhale, 2+Math.random()*1.5, .9,.85,.82);
+  if (flyExhale > 0) for (let k=0; k<flyExhale*4; k++)
+    emit(smoke, mouthWorld.x, mouthWorld.y, mouthWorld.z, (Math.random()-.5)*.15 + camRight.x*.45*flyExhale, .2+Math.random()*.2, (Math.random()-.5)*.15 + camRight.z*.45*flyExhale, 2+Math.random()*1.5, .9,.85,.82);
 
   // --- neurons: activity starts in the central lobes and cascades outward along synapses ---
   seedBurst = Math.max(0, seedBurst - dt*.6);
@@ -644,12 +653,12 @@ function animate(){
   bloom.strength = .22 + glow*.12 + torch*.1;
 
   // --- smoke: a small wisp curling up from the fly's mouth, a little more right after a puff ---
-  const wisp = .15 + glow*.8 + torch*2;
+  const wisp = .1 + glow*.6 + torch*1.5;
   for (let k=0;k<wisp;k++)
-    emit(smoke, mouthWorld.x+(Math.random()-.5)*.06, mouthWorld.y+.02, mouthWorld.z+(Math.random()-.5)*.06, (Math.random()-.5)*.12, .25+Math.random()*.2, (Math.random()-.5)*.12, 1.6+Math.random()*1.4, .85,.8,.75);
+    emit(smoke, mouthWorld.x+(Math.random()-.5)*.06, mouthWorld.y+.02, mouthWorld.z+(Math.random()-.5)*.06, (Math.random()-.5)*.12 + camRight.x*.3, .25+Math.random()*.2, (Math.random()-.5)*.12 + camRight.z*.3, 1.6+Math.random()*1.4, .85,.8,.75);
   bowl.getWorldPosition(bowlWorld);
   if (Math.random() < .12 + torch*.4)
-    emit(smoke, bowlWorld.x, bowlWorld.y+.12, bowlWorld.z, (Math.random()-.5)*.08, .2+Math.random()*.15, (Math.random()-.5)*.08, 1.2+Math.random(), .8,.7,.65);
+    emit(smoke, bowlWorld.x, bowlWorld.y+.06, bowlWorld.z, (Math.random()-.5)*.08 + camRight.x*.3, .22+Math.random()*.15, (Math.random()-.5)*.08 + camRight.z*.3, 1.2+Math.random(), .8,.7,.65);
   fireworkTimer -= dt;
   if (glow > .5 && fireworkTimer <= 0){ fireworks(false); fireworkTimer = 2.5 + (1-glow)*4; }
 
@@ -669,8 +678,8 @@ function animate(){
     cjBlunt.userData.ember.getWorldPosition(cjEmberW);
     const cjHit = Math.max(0, Math.sin(t*.45)) ** 6 * .4 + cjDrag;   // a lazy idle rhythm, plus his turn in the sequence
     cjBlunt.userData.light.intensity = .6 + cjHit*4 + torch*3;
-    if (Math.random() < .25 + cjHit) emit(smoke, cjEmberW.x, cjEmberW.y+.03, cjEmberW.z, (Math.random()-.5)*.06, .18+Math.random()*.12, (Math.random()-.5)*.06, 1.4+Math.random(), .8,.72,.68);
-    const exhale = Math.max(0, Math.sin(t*.45 - 1.2)) ** 8 * 1.2 + cjExhale*10;
+    if (Math.random() < .15 + cjHit*.7) emit(smoke, cjEmberW.x, cjEmberW.y+.03, cjEmberW.z, (Math.random()-.5)*.06, .18+Math.random()*.12, (Math.random()-.5)*.06, 1.4+Math.random(), .8,.72,.68);
+    const exhale = Math.max(0, Math.sin(t*.45 - 1.2)) ** 8 * .8 + cjExhale*7;
     for (let k=0;k<exhale;k++) emit(smoke, cjMouthW.x, cjMouthW.y, cjMouthW.z, (Math.random()-.5)*.1, .22+Math.random()*.15, (Math.random()-.5)*.1 - .12, 1.8+Math.random()*1.2, .85,.8,.78);
     if (cjMesh) cjMesh.rotation.x = cjMesh.userData.rx ?? (cjMesh.userData.rx = cjMesh.rotation.x), cjMesh.rotation.x = cjMesh.userData.rx + Math.sin(t*1.1)*.012 + listen*.03*Math.sin(t*9) + cjDrag*.06 - cjExhale*.05;
   }
