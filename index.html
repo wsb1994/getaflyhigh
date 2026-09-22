@@ -153,12 +153,12 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x1a0c14, 0.022);
 
 const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
-camera.position.set(3.4, 3.4, 5.2);
+camera.position.set(2.2, 2.6, 0.6);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(-0.3, 1.6, -2.4);
+controls.target.set(0.1, 1.9, -4.3);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI/2 - 0.03;
-controls.minDistance = 3; controls.maxDistance = 18;
+controls.minDistance = 2.2; controls.maxDistance = 18;
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
@@ -336,7 +336,7 @@ zune.position.set(1.0, 0.37*ROOM_S + .16, -0.55*ROOM_S); zune.rotation.y = -.5; 
 // ---------- THE FLY (sculpted model, assets/fly.glb) ----------
 const fly = new THREE.Group();
 const FLY_Y = 0.41*ROOM_S;              // couch seat height
-fly.position.set(-0.45*ROOM_S, FLY_Y, -1.5*ROOM_S); fly.rotation.y = -.55; scene.add(fly);
+fly.position.set(-0.45*ROOM_S, FLY_Y, -1.55*ROOM_S); fly.rotation.y = 1.35; scene.add(fly);
 let eyeMat = null, wingMesh = null, headMesh = null;
 const headLocal = new THREE.Vector3(0, .55, .8);     // updated from the eye mesh once loaded
 const mouthLocal = new THREE.Vector3(0, .3, .9);
@@ -377,7 +377,7 @@ const bowl = pipe.userData.ember, ember = pipe.userData.ember, emberLight = pipe
 fly.add(pipe);
 function placeBlunt(){ pipe.position.copy(mouthLocal); pipe.rotation.set(0, .55, -.15); }
 // CJ's blunt sits in his raised hand; the empty from Blender marks the hand
-const cjBlunt = makeBlunt(.16/ROOM_S*ROOM_S, .014); cjBlunt.visible = false; scene.add(cjBlunt);
+const cjBlunt = makeBlunt(.34, .03); cjBlunt.visible = false; scene.add(cjBlunt);
 const cjHandW = new THREE.Vector3(), cjMouthW = new THREE.Vector3(), cjEmberW = new THREE.Vector3();
 // cans over the eyes, so the fly is listening rather than being wired up
 function addCans(){
@@ -489,6 +489,10 @@ const tmpC = new THREE.Color();
 let dose = 0, doseTarget = 0, torch = 0, fireworkTimer = 0, wingPhase = 0;
 const btn = document.getElementById('puff'), meter = document.querySelector('#meter > div');
 let seedBurst = 0, bakedTimer = null, listen = 0, puffCount = 0, bakedHold = 0;
+const SEQ_FREEZE = parseFloat(new URLSearchParams(location.search).get('seq') ?? '-1');
+let seqStart = -100;   // clock time the last hit began; drives the fly-then-smoker choreography
+const env = (x, a, b) => Math.max(0, Math.min(1, (x - a) / (b - a)));   // 0..1 ramp between a and b
+const bump = (x, a, b) => { const u = env(x, a, b); return Math.sin(u * Math.PI); };  // rises then falls over a..b
 const BAKED_FOR = 26;
 const PHRASES = ['Certified Baked', 'Fly High', 'Addicted!'];
 const baked = document.getElementById('baked');
@@ -500,7 +504,7 @@ function showPhrase(text){
   bakedTimer = setTimeout(() => baked.classList.remove('on'), BAKED_FOR * 1000);
 }
 btn.addEventListener('click', () => {
-  doseTarget = Math.min(1, doseTarget + .4); torch = 1; seedBurst = 1; fireworks(true);
+  doseTarget = Math.min(1, doseTarget + .4); torch = 1; seedBurst = 1; fireworks(true); seqStart = clock.elapsedTime;
   brainPuff();
   puffCount++;
   const step = puffCount % 3;
@@ -551,12 +555,26 @@ function animate(){
   fly.position.y = FLY_Y + Math.sin(t*(2+glow*20))*.01*glow*glow + torch*.03*Math.sin(t*40) + listen * .12;
   fly.rotation.z = Math.sin(t*1.3)*.04*glow + torch*.05*Math.sin(t*33);
   fly.rotation.x = Math.sin(t*.9)*.05*glow;
+  fly.localToWorld(mouthWorld.copy(mouthLocal));
   wingPhase += dt*(1.5 + glow*60);
   if (wingMesh) wingMesh.rotation.x = Math.sin(wingPhase)*(.02 + glow*.18);
   if (eyeMat) { eyeMat.emissiveIntensity = .5 + glow*4; eyeMat.emissive.setHSL(.01, 1, .2+glow*.35); }
   ember.material.color.setHSL(.05, 1, .35 + torch*.3);
   emberLight.intensity = 1 + torch*10;
   fly.localToWorld(headWorld.copy(headLocal));
+  // choreography: 0-1.1s the fly pulls the blunt in and drags, 1.1-2.3s it blows the cloud out,
+  // 2.3-3.5s the smoker takes his drag, 3.5-5s he exhales
+  const sq = SEQ_FREEZE >= 0 ? SEQ_FREEZE : t - seqStart;   // ?seq=1.8 holds the choreography at that second, for screenshots
+  const flyDrag = bump(sq, 0, 1.2), flyExhale = bump(sq, 1.1, 2.4);
+  const cjDrag = bump(sq, 2.3, 3.6), cjExhale = bump(sq, 3.5, 5.0);
+  pipe.rotation.set(0, .55 + flyDrag*.6, -.15 - flyDrag*.35);
+  pipe.position.copy(mouthLocal); pipe.position.x -= flyDrag*.05; pipe.position.y += flyDrag*.03;
+  fly.rotation.x += flyDrag*.12 - flyExhale*.1;            // lean into the drag, tip back on the exhale
+  fly.position.y += flyExhale*.05;
+  ember.material.color.setHSL(.05, 1, .35 + torch*.3 + flyDrag*.3);
+  emberLight.intensity = 1 + torch*10 + flyDrag*14;
+  if (flyExhale > 0) for (let k=0; k<flyExhale*9; k++)
+    emit(smoke, mouthWorld.x, mouthWorld.y, mouthWorld.z, (Math.random()-.5)*.15 + .25*flyExhale, .18+Math.random()*.2, (Math.random()-.5)*.15 + .35*flyExhale, 2+Math.random()*1.5, .9,.85,.82);
 
   // --- neurons: activity starts in the central lobes and cascades outward along synapses ---
   seedBurst = Math.max(0, seedBurst - dt*.6);
@@ -600,7 +618,6 @@ function animate(){
   bloom.strength = .45 + glow*.25 + torch*.2;
 
   // --- smoke: a small wisp curling up from the fly's mouth, a little more right after a puff ---
-  fly.localToWorld(mouthWorld.copy(mouthLocal));
   const wisp = .6 + glow*2 + torch*6;
   for (let k=0;k<wisp;k++)
     emit(smoke, mouthWorld.x+(Math.random()-.5)*.06, mouthWorld.y+.02, mouthWorld.z+(Math.random()-.5)*.06, (Math.random()-.5)*.12, .25+Math.random()*.2, (Math.random()-.5)*.12, 1.6+Math.random()*1.4, .85,.8,.75);
@@ -624,12 +641,12 @@ function animate(){
     cjBlunt.position.copy(cjHandW); cjBlunt.lookAt(cjMouthW); cjBlunt.rotateY(Math.PI/2); // x axis points away from the mouth
     cjBlunt.rotateY(Math.PI);
     cjBlunt.userData.ember.getWorldPosition(cjEmberW);
-    const cjHit = Math.max(0, Math.sin(t*.45)) ** 6;   // a slow rhythm of hits
+    const cjHit = Math.max(0, Math.sin(t*.45)) ** 6 * .4 + cjDrag;   // a lazy idle rhythm, plus his turn in the sequence
     cjBlunt.userData.light.intensity = .6 + cjHit*4 + torch*3;
     if (Math.random() < .25 + cjHit) emit(smoke, cjEmberW.x, cjEmberW.y+.03, cjEmberW.z, (Math.random()-.5)*.06, .18+Math.random()*.12, (Math.random()-.5)*.06, 1.4+Math.random(), .8,.72,.68);
-    const exhale = Math.max(0, Math.sin(t*.45 - 1.2)) ** 8 * 3 + torch*2;
+    const exhale = Math.max(0, Math.sin(t*.45 - 1.2)) ** 8 * 1.2 + cjExhale*10;
     for (let k=0;k<exhale;k++) emit(smoke, cjMouthW.x, cjMouthW.y, cjMouthW.z, (Math.random()-.5)*.1, .22+Math.random()*.15, (Math.random()-.5)*.1 - .12, 1.8+Math.random()*1.2, .85,.8,.78);
-    if (cjMesh) cjMesh.rotation.x = cjMesh.userData.rx ?? (cjMesh.userData.rx = cjMesh.rotation.x), cjMesh.rotation.x = cjMesh.userData.rx + Math.sin(t*1.1)*.012 + listen*.03*Math.sin(t*9);
+    if (cjMesh) cjMesh.rotation.x = cjMesh.userData.rx ?? (cjMesh.userData.rx = cjMesh.rotation.x), cjMesh.rotation.x = cjMesh.userData.rx + Math.sin(t*1.1)*.012 + listen*.03*Math.sin(t*9) + cjDrag*.06 - cjExhale*.05;
   }
 
   controls.update();
