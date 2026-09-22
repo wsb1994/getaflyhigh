@@ -19,13 +19,14 @@
   #meter > div { height:100%; width:0%; background:linear-gradient(90deg,#ff3c00,#ffb347,#fff0a0); transition:width .3s; }
   #hint { position:absolute; left:16px; bottom:16px; font-size:12px; color:#7a5a44; }
   #vignette { position:absolute; inset:0; background: radial-gradient(ellipse at center, transparent 55%, #000 130%); }
-  #radio { position:absolute; left:16px; top:16px; width:260px; pointer-events:auto; background:#140906cc; border:1px solid #5a3420; border-radius:12px; overflow:hidden; backdrop-filter: blur(6px); }
+  #radio { display:none; position:absolute; left:16px; top:16px; width:260px; pointer-events:auto; background:#140906cc; border:1px solid #5a3420; border-radius:12px; overflow:hidden; backdrop-filter: blur(6px); }
   #radio .label { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#c9903a; padding:8px 12px 4px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
-  #radio .label b { font-weight:normal; cursor:pointer; color:#ffd9b8; border:1px solid #5a3420; border-radius:8px; padding:2px 8px; }
+  #radio.on { display:block; }
+  #radio .label b { margin-left:4px; font-weight:normal; cursor:pointer; color:#ffd9b8; border:1px solid #5a3420; border-radius:8px; padding:2px 8px; }
   #track { padding:2px 12px 0; font-family: Impact, "Arial Black", sans-serif; font-size:16px; letter-spacing:.03em; color:#f3e2c2; }
   #by { font-size:11px; color:#a58a6a; padding:2px 12px 8px; }
   #eq { display:flex; align-items:flex-end; gap:3px; height:28px; padding:0 12px 10px; }
-  #eq i { display:block; flex:1; height:4px; background:#ff6a2a; border-radius:2px; opacity:.85; }
+  #eq i { display:block; flex:1; height:4px; border-radius:2px; opacity:.95; background-image: linear-gradient(90deg,#ff3b3b,#ffb03b,#fff23b,#3bff6a,#3bd8ff,#7b5bff,#ff3bd8,#ff3b3b); background-repeat: repeat-x; }   /* size and position set per frame from the Certified Baked text */
   #brainbox { position:absolute; right:16px; bottom:16px; width:300px; height:230px; pointer-events:auto; background:#0a0612dd; border:1px solid #3a2a5a; border-radius:12px; overflow:hidden; backdrop-filter: blur(6px); }
   #brainbox .label { position:absolute; left:0; right:0; top:0; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#b48cff; padding:8px 12px; display:flex; justify-content:space-between; }
   #brainbox canvas { width:100%; height:100%; }
@@ -33,13 +34,10 @@
     background-image: linear-gradient(90deg,#ff3b3b,#ffb03b,#fff23b,#3bff6a,#3bd8ff,#7b5bff,#ff3bd8,#ff3b3b); background-size:300% 100%;
     -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
     filter: drop-shadow(0 0 8px #fff8) drop-shadow(0 0 18px #ff5aff88); }
+  #baked { animation: rainbow 2.2s linear infinite; }
   #baked.on { opacity:1; animation: rainbow 2.2s linear infinite, pulse 1.2s ease-in-out infinite; }
   @keyframes rainbow { from { background-position:0% 0; } to { background-position:300% 0; } }
   @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.55; transform:scale(1.05); } }
-  #pips { display:flex; justify-content:center; gap:8px; margin-top:8px; }
-  #pips i { width:10px; height:10px; border-radius:50%; background:#2a1610; border:1px solid #5a3420; display:block; }
-  #pips i.on { background:#ff6a2a; box-shadow:0 0 8px #ff6a2a; }
-  #combo { font-size:11px; color:#a58a6a; margin-top:6px; letter-spacing:.08em; text-transform:uppercase; }
   @media (max-width:700px){ #hint{display:none;} #radio{width:200px;} #brainbox{width:180px;height:140px;} #baked{font-size:14px;} }
 </style>
 </head>
@@ -47,9 +45,9 @@
 <div id="vignette"></div>
 <div id="hud">
   <div id="radio">
-    <div class="label"><span>♫ TeamSESH · third puff</span><b id="radioPlay">▶ play</b></div>
+    <div class="label"><span>♫ TeamSESH</span><span><b id="radioMute">🔊 mute</b><b id="radioStop">■ stop</b></span></div>
     <div id="track">IfYouHadAZuneIHateYou</div>
-    <div id="by">BONES ft. Spooky Black · starts on the third puff, then fades</div>
+    <div id="by">BONES ft. Spooky Black</div>
     <div id="eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   </div>
   <div id="brainbox">
@@ -61,8 +59,6 @@
     <h1>Fruit Fly Crib Sesh</h1>
     <button id="puff">🍃 Press to give the fly a hit</button>
     <div id="meter"><div></div></div>
-    <div id="pips"><i></i><i></i><i></i></div>
-    <div id="combo">three hits</div>
   </div>
   <div id="hint">drag to orbit · scroll to zoom</div>
 </div>
@@ -72,7 +68,8 @@
 // A plain audio element starts on the click. The Web Audio clock was firing
 // this seconds late.
 const PHRASE = 80, FADE = 6;
-const radioPlay = document.getElementById('radioPlay');
+const radioBox = document.getElementById('radio'), radioStop = document.getElementById('radioStop'), radioMute = document.getElementById('radioMute');
+let muted = false;
 const eqBars = [...document.querySelectorAll('#eq i')];
 // Two copies so a later third puff can start over at the first hit.
 // Different URLs keep the browser from sharing one playhead.
@@ -91,7 +88,7 @@ function stopSting(){
   flyRadio.playing = false;
   flyRadio.level = 0;
   clearInterval(fadeTimer);
-  radioPlay.textContent = '▶ play';
+  radioBox.classList.remove('on');
 }
 function playSting(){
   const next = voices[voice];
@@ -101,7 +98,8 @@ function playSting(){
   next.volume = 1;
   flyRadio.playing = true;
   flyRadio.level = 1;
-  radioPlay.textContent = '❚❚ pause';
+  radioBox.classList.add('on');
+  next.muted = muted;
   const my = ++runId;
   const started = performance.now();
   clearInterval(fadeTimer);
@@ -117,8 +115,8 @@ function playSting(){
   const pending = next.play();
   if (pending) pending.catch(err => console.error(err));
 }
-function toggleRadio(){ if (flyRadio.playing) stopSting(); else playSting(); }
-radioPlay.onclick = (ev) => { ev.stopPropagation(); toggleRadio(); };
+radioStop.onclick = (ev) => { ev.stopPropagation(); stopSting(); };
+radioMute.onclick = (ev) => { ev.stopPropagation(); muted = !muted; voices.forEach(a => a.muted = muted); radioMute.textContent = muted ? '🔇 unmute' : '🔊 mute'; };
 </script>
 
 <script src="assets/fly_model.js"></script>
@@ -302,12 +300,12 @@ function hangPosters(){
   lp.rotation.y = Math.PI/2; lp.position.set(-3*ROOM_S + .1, 1.8*ROOM_S, 1.2*ROOM_S); scene.add(lp);
   const dg = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['DEER', 'GOD', '🦌'], '#0a0a0a', '#d8d8d8') })));
   dg.rotation.y = Math.PI/2; dg.position.set(-3*ROOM_S + .1, 1.75*ROOM_S, 0.1*ROOM_S); scene.add(dg);
-  // the album still on the back wall, facing the camera
+  // the album still on the left wall, facing into the room
   new THREE.TextureLoader().load('assets/poster_yt.png', (t) => {
-    const yp = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.46), psxify(new THREE.MeshLambertMaterial({ map: pixelTex(t) })));
-    yp.position.set(-2.5*ROOM_S, 1.22*ROOM_S, -2.5*ROOM_S + .1); scene.add(yp);   // back wall, left of the bookshelf
-    const frame = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.66), psxify(new THREE.MeshLambertMaterial({ color: 0xe8e8e8 })));
-    frame.position.copy(yp.position); frame.position.z -= .02; scene.add(frame);
+    const yp = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.9), psxify(new THREE.MeshLambertMaterial({ map: pixelTex(t) })));
+    yp.rotation.y = Math.PI/2; yp.position.set(-3*ROOM_S + .12, 1.22*ROOM_S, -2.0*ROOM_S); scene.add(yp);   // left wall, same spot mirrored round the corner
+    const frame = new THREE.Mesh(new THREE.PlaneGeometry(2.08, 2.08), psxify(new THREE.MeshLambertMaterial({ color: 0xe8e8e8 })));
+    frame.rotation.y = Math.PI/2; frame.position.copy(yp.position); frame.position.x -= .02; scene.add(frame);
   });
 }
 
@@ -531,7 +529,6 @@ const bump = (x, a, b) => { const u = env(x, a, b); return Math.sin(u * Math.PI)
 const BAKED_FOR = 26;
 const PHRASES = ['Certified Baked', 'Fly High', 'Addicted!'];
 const baked = document.getElementById('baked');
-const pips = [...document.querySelectorAll('#pips i')];
 function showPhrase(text){
   baked.textContent = text;
   baked.classList.add('on');
@@ -543,7 +540,6 @@ btn.addEventListener('click', () => {
   brainPuff();
   puffCount++;
   const step = puffCount % 3;
-  pips.forEach((pip, i) => pip.classList.toggle('on', step === 0 ? true : i < step));
   if (step === 0) {
     playSting();
     showPhrase(PHRASES[(puffCount / 3 - 1) % PHRASES.length]);
@@ -585,6 +581,11 @@ function animate(){
       bar.style.height = (4 + listen * wobble * 24) + 'px';
     });
   } else radio.eqBars.forEach(bar => { bar.style.height = '4px'; });
+  // the bars borrow the text's rainbow: same gradient stretched over the whole row, same animated offset
+  if (radio.playing) {
+    const row = radio.eqBars[0].parentElement, W = row.clientWidth - 24, p = parseFloat(getComputedStyle(baked).backgroundPositionX) || 0;
+    radio.eqBars.forEach((bar, i) => { bar.style.backgroundSize = (3*W) + 'px 100%'; bar.style.backgroundPositionX = (-2*W*p/100 - bar.offsetLeft + 12) + 'px'; });
+  }
 
   // --- the fly reacts ---
   fly.position.y = FLY_Y + Math.sin(t*(2+glow*20))*.01*glow*glow + torch*.03*Math.sin(t*40) + listen * .12;
