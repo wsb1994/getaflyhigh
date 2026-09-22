@@ -136,6 +136,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+const Q = new URLSearchParams(location.search);   // ?demo ?seq=1.8 ?tilt=-0.9 ?cam=x,y,z,tx,ty,tz
 
 // ---------- renderer / scene ----------
 // PS1 look: render into a tiny buffer and let the browser upscale it with no smoothing
@@ -162,7 +163,7 @@ controls.minDistance = 2.2; controls.maxDistance = 18;
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(psxW(), psxH()), 0.35, 0.6, 0.35);
+const bloom = new UnrealBloomPass(new THREE.Vector2(psxW(), psxH()), 0.22, 0.5, 0.6);
 composer.addPass(bloom);
 // 15-bit colour with an ordered dither, like the console's output
 const ditherPass = new ShaderPass({
@@ -300,6 +301,13 @@ function hangPosters(){
   // a poster of the lowrider on the left wall, facing +x
   const lp = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['SESH', 'HOLD'], '#0a0a0a', '#e0e0e0', 144, 96) })));
   lp.rotation.y = Math.PI/2; lp.position.set(-3*ROOM_S + .1, 1.8*ROOM_S, 1.2*ROOM_S); scene.add(lp);
+  // a video still on the left wall, facing into the room
+  new THREE.TextureLoader().load('assets/poster_yt.png', (t) => {
+    const yp = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.46), psxify(new THREE.MeshLambertMaterial({ map: pixelTex(t) })));
+    yp.rotation.y = Math.PI/2; yp.position.set(-3*ROOM_S + .12, 1.75*ROOM_S, 0.1*ROOM_S); scene.add(yp);   // left wall, beside the Sesh Hold poster
+    const frame = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.66), psxify(new THREE.MeshLambertMaterial({ color: 0xe8e8e8 })));
+    frame.rotation.y = Math.PI/2; frame.position.copy(yp.position); frame.position.x -= .02; scene.add(frame);
+  });
 }
 
 // lights: a warm overhead, the lava lamp, the TV, the void leaking in through the windows
@@ -335,8 +343,24 @@ zune.position.set(1.0, 0.37*ROOM_S + .16, -0.55*ROOM_S); zune.rotation.y = -.5; 
 
 // ---------- THE FLY (sculpted model, assets/fly.glb) ----------
 const fly = new THREE.Group();
-const FLY_Y = 0.41*ROOM_S + .05;        // couch seat height, leg tips resting on the cushion
-fly.position.set(-0.4*ROOM_S, FLY_Y, -1.52*ROOM_S); fly.rotation.y = 1.35; scene.add(fly);
+const SEAT_Y = 0.41*ROOM_S, BACKREST_Z = -1.81*ROOM_S;   // couch seat top and the backrest's front face
+let FLY_Y = SEAT_Y, FLY_TILT = parseFloat(Q.get('tilt') ?? '-0.35'), FLY_YAW = parseFloat(Q.get('yaw') ?? '1.35');   // lounging: abdomen on the cushion, head up
+fly.position.set(-0.45*ROOM_S, FLY_Y, -1.55*ROOM_S); fly.rotation.set(FLY_TILT, FLY_YAW, 0); scene.add(fly);
+function seatFly(){
+  // fit the fly model inside the left cushion: between the armrest and the smoker, in front of the backrest,
+  // resting on the seat. exact vertex bounds, and shrink it if it does not fit.
+  const CUSHION = { xMin: -0.5*ROOM_S + .05, xMax: 0.25*ROOM_S, zMin: BACKREST_Z + .05, zMax: -1.23*ROOM_S - .05 };
+  const model = fly.children.find(c => c.userData.isFlyModel);
+  fly.rotation.set(FLY_TILT, FLY_YAW, 0); fly.position.set(0, 0, 0); fly.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(model, true);
+  const w = b.max.x - b.min.x, d = b.max.z - b.min.z;
+  const fit = Math.min(1, (CUSHION.xMax - CUSHION.xMin) / w, (CUSHION.zMax - CUSHION.zMin) / d);
+  if (fit < 1) { model.scale.multiplyScalar(fit); fly.updateMatrixWorld(true); b.setFromObject(model, true); }
+  FLY_Y = SEAT_Y - b.min.y + .02;
+  fly.position.set((CUSHION.xMin + CUSHION.xMax)/2 - (b.min.x + b.max.x)/2, FLY_Y, CUSHION.zMin - b.min.z);
+  fly.updateMatrixWorld(true);
+  if (Q.has('debug')) { const bb = new THREE.Box3().setFromObject(model, true); console.log('FLYBOX', JSON.stringify(bb), 'cushion', JSON.stringify(CUSHION), 'fit', fit); }
+}
 let eyeMat = null, wingMesh = null, headMesh = null;
 const headLocal = new THREE.Vector3(0, .55, .8);     // updated from the eye mesh once loaded
 const mouthLocal = new THREE.Vector3(0, .3, .9);
@@ -345,7 +369,7 @@ new GLTFLoader().parse(flyBytes, '', (g) => {
   const m = g.scene;
   const box = new THREE.Box3().setFromObject(m); const size = box.getSize(new THREE.Vector3());
   const s = 1.7 / Math.max(size.x, size.y, size.z); m.scale.setScalar(s);
-  box.setFromObject(m); m.position.y -= box.min.y;                     // stand on the cushion
+  box.setFromObject(m); m.position.sub(box.getCenter(new THREE.Vector3()));   // centre the model so the tilt pivots around its body
   m.updateMatrixWorld(true);
   m.traverse(o => {
     if (!o.isMesh) return;
@@ -357,7 +381,8 @@ new GLTFLoader().parse(flyBytes, '', (g) => {
     else { o.material = new THREE.MeshStandardMaterial({ color:0x15100a, roughness:.5, metalness:.2 }); }
     psxify(o.material);
   });
-  fly.add(m);
+  m.userData.isFlyModel = true; fly.add(m);
+  seatFly();
   placeBlunt();
   addCans();
 }, (err) => console.error('fly model failed to parse', err));
@@ -369,10 +394,10 @@ function makeBlunt(len=.55, r=.045){
   const ash = new THREE.Mesh(new THREE.CylinderGeometry(r*.95, r*.85, len*.12, 8), psxify(new THREE.MeshLambertMaterial({ color:0x8a8a86 })));
   ash.rotation.z = Math.PI/2; ash.position.x = len*1.0; g.add(ash);
   const ember = new THREE.Mesh(new THREE.SphereGeometry(r*.9, 8, 6), new THREE.MeshBasicMaterial({ color:0xff6a10 })); ember.position.x = len*1.08; g.add(ember);
-  const light = new THREE.PointLight(0xff5a10, 1, 3, 2); light.position.copy(ember.position); g.add(light);
+  const light = new THREE.PointLight(0xff5a10, .4, 2, 2); light.position.copy(ember.position); g.add(light);
   g.userData = { ember, light }; return g;
 }
-const pipe = makeBlunt(.6, .05);                 // the fly's
+const pipe = makeBlunt(.5, .04);                 // the fly's
 const bowl = pipe.userData.ember, ember = pipe.userData.ember, emberLight = pipe.userData.light;
 fly.add(pipe);
 function placeBlunt(){ pipe.position.copy(mouthLocal); pipe.rotation.set(0, .55, -.15); }
@@ -489,7 +514,8 @@ const tmpC = new THREE.Color();
 let dose = 0, doseTarget = 0, torch = 0, fireworkTimer = 0, wingPhase = 0;
 const btn = document.getElementById('puff'), meter = document.querySelector('#meter > div');
 let seedBurst = 0, bakedTimer = null, listen = 0, puffCount = 0, bakedHold = 0;
-const SEQ_FREEZE = parseFloat(new URLSearchParams(location.search).get('seq') ?? '-1');
+const SEQ_FREEZE = parseFloat(Q.get('seq') ?? '-1');
+if (Q.has('cam')) { const v = Q.get('cam').split(',').map(Number); camera.position.set(v[0], v[1], v[2]); controls.target.set(v[3], v[4], v[5]); }
 let seqStart = -100;   // clock time the last hit began; drives the fly-then-smoker choreography
 const env = (x, a, b) => Math.max(0, Math.min(1, (x - a) / (b - a)));   // 0..1 ramp between a and b
 const bump = (x, a, b) => { const u = env(x, a, b); return Math.sin(u * Math.PI); };  // rises then falls over a..b
@@ -519,7 +545,7 @@ btn.addEventListener('click', () => {
 
 function fireworks(big){
   fly.localToWorld(headWorld.copy(headLocal));
-  const n = big ? 260 : 80, hue = Math.random();
+  const n = big ? 120 : 30, hue = Math.random();
   for (let k=0;k<n;k++){
     const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1), sp=(big?2.4:1.6)*(.6+Math.random()*.6);
     tmpC.setHSL((hue + (Math.random()<.5?0:.5) + Math.random()*.08)%1, 1, .6);
@@ -554,7 +580,7 @@ function animate(){
   // --- the fly reacts ---
   fly.position.y = FLY_Y + Math.sin(t*(2+glow*20))*.01*glow*glow + torch*.03*Math.sin(t*40) + listen * .12;
   fly.rotation.z = Math.sin(t*1.3)*.04*glow + torch*.05*Math.sin(t*33);
-  fly.rotation.x = Math.sin(t*.9)*.05*glow;
+  fly.rotation.x = FLY_TILT + Math.sin(t*.9)*.05*glow;
   fly.localToWorld(mouthWorld.copy(mouthLocal));
   wingPhase += dt*(1.5 + glow*60);
   if (wingMesh) wingMesh.rotation.x = Math.sin(wingPhase)*(.02 + glow*.18);
@@ -572,8 +598,8 @@ function animate(){
   fly.rotation.x += flyDrag*.12 - flyExhale*.1;            // lean into the drag, tip back on the exhale
   fly.position.y += flyExhale*.05;
   ember.material.color.setHSL(.05, 1, .35 + torch*.3 + flyDrag*.3);
-  emberLight.intensity = 1 + torch*10 + flyDrag*14;
-  if (flyExhale > 0) for (let k=0; k<flyExhale*9; k++)
+  emberLight.intensity = .4 + torch*2.5 + flyDrag*4;
+  if (flyExhale > 0) for (let k=0; k<flyExhale*5; k++)
     emit(smoke, mouthWorld.x, mouthWorld.y, mouthWorld.z, (Math.random()-.5)*.15 + .25*flyExhale, .18+Math.random()*.2, (Math.random()-.5)*.15 + .35*flyExhale, 2+Math.random()*1.5, .9,.85,.82);
 
   // --- neurons: activity starts in the central lobes and cascades outward along synapses ---
@@ -602,7 +628,7 @@ function animate(){
     nHeat[i]=h; if (h > .6) firing++;
     tmpC.setHSL(.78 - h*.7, 1, .12 + h*.55);
     nCol[i*3]=tmpC.r; nCol[i*3+1]=tmpC.g; nCol[i*3+2]=tmpC.b;
-    if (nFired[i] && nRad[i] > .55 && Math.random() < glow*.06){   // outer-shell spikes spit fire out of the fly's head
+    if (nFired[i] && nRad[i] > .55 && Math.random() < glow*.015){   // outer-shell spikes spit fire out of the fly's head
       v3.set(nPos[i*3],nPos[i*3+1],nPos[i*3+2]).normalize();
       const sp = .5 + torch*.8 + Math.random()*.4;
       emit(fire, headWorld.x+v3.x*.3, headWorld.y+v3.y*.3, headWorld.z+v3.z*.3, v3.x*sp+(Math.random()-.5)*.2, Math.abs(v3.y)*sp+.6, v3.z*sp+(Math.random()-.5)*.2, .3+Math.random()*.3, 1,.75,.2);
@@ -615,17 +641,17 @@ function animate(){
   brain.rotation.y = t*.35; brain.rotation.x = Math.sin(t*.4)*.2;
   brainStat.textContent = `${firing} synapses firing`;
   stepBrainSmoke(dt, t);
-  bloom.strength = .45 + glow*.25 + torch*.2;
+  bloom.strength = .22 + glow*.12 + torch*.1;
 
   // --- smoke: a small wisp curling up from the fly's mouth, a little more right after a puff ---
-  const wisp = .6 + glow*2 + torch*6;
+  const wisp = .15 + glow*.8 + torch*2;
   for (let k=0;k<wisp;k++)
     emit(smoke, mouthWorld.x+(Math.random()-.5)*.06, mouthWorld.y+.02, mouthWorld.z+(Math.random()-.5)*.06, (Math.random()-.5)*.12, .25+Math.random()*.2, (Math.random()-.5)*.12, 1.6+Math.random()*1.4, .85,.8,.75);
   bowl.getWorldPosition(bowlWorld);
-  if (Math.random() < .3 + torch)
+  if (Math.random() < .12 + torch*.4)
     emit(smoke, bowlWorld.x, bowlWorld.y+.12, bowlWorld.z, (Math.random()-.5)*.08, .2+Math.random()*.15, (Math.random()-.5)*.08, 1.2+Math.random(), .8,.7,.65);
   fireworkTimer -= dt;
-  if (glow > .35 && fireworkTimer <= 0){ fireworks(false); fireworkTimer = .9 + (1-glow)*2.5; }
+  if (glow > .5 && fireworkTimer <= 0){ fireworks(false); fireworkTimer = 2.5 + (1-glow)*4; }
 
   step(smoke, dt, (i)=>{ smoke.vel[i*3]+=Math.sin(t*1.1+i)*dt*.12; smoke.vel[i*3+2]+=Math.cos(t*.9+i*1.7)*dt*.12; smoke.vel[i*3+1]*=1-dt*.2; }, (i,l)=> (1-l)*Math.min(1,l*4)*.7);
   step(fire, dt, (i)=>{ fire.vel[i*3+1]+=dt*1.5; }, (i,l)=>{ tmpC.setHSL(.12-l*.12, 1, .7-l*.5); fire.base[i*3]=tmpC.r; fire.base[i*3+1]=tmpC.g; fire.base[i*3+2]=tmpC.b; return 1; });
