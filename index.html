@@ -289,16 +289,16 @@ function posterTex(lines, bg, fg, w=96, h=144){
 function hangPosters(){
   // back wall is at kit y=+2.5 -> three z = -2.5*ROOM_S; walls face -z
   const specs = [
-    [-1.6, [ 'WEST', 'SIDE', '★' ], '#1b0a2a', '#e8d27a'],
+    [-1.6, [ 'DEER', 'GOD', '🦌' ], '#0a0a0a', '#d8d8d8'],
     [ 0.2, [ 'TEAM', 'SESH', 'DEADBOYS' ], '#0a0a0a', '#e8e8e8'],
-    [ 1.4, [ 'G', 'FUNK', 'ERA' ], '#2a0d1a', '#ff7ac8'],
+    [ 1.4, [ 'EDDY', 'BAKER', '☠' ], '#101010', '#c8c8c8'],
   ];
   for (const [x, lines, bg, fg] of specs) {
     const p = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), psxify(new THREE.MeshLambertMaterial({ map: posterTex(lines, bg, fg) })));
-    p.position.set(x*ROOM_S, 1.75*ROOM_S, -2.5*ROOM_S + .1); scene.add(p);
+    p.position.set(x*ROOM_S, 1.5*ROOM_S, -2.5*ROOM_S + .1); scene.add(p);
   }
   // a poster of the lowrider on the left wall, facing +x
-  const lp = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['LOW', 'RIDER'], '#101a3a', '#ffd25a', 144, 96) })));
+  const lp = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['SESH', 'HOLD'], '#0a0a0a', '#e0e0e0', 144, 96) })));
   lp.rotation.y = Math.PI/2; lp.position.set(-3*ROOM_S + .1, 1.8*ROOM_S, 1.2*ROOM_S); scene.add(lp);
 }
 
