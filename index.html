@@ -305,7 +305,7 @@ function hangPosters(){
   // the album still on the back wall, facing the camera
   new THREE.TextureLoader().load('assets/poster_yt.png', (t) => {
     const yp = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.46), psxify(new THREE.MeshLambertMaterial({ map: pixelTex(t) })));
-    yp.position.set(-2.15*ROOM_S, 1.22*ROOM_S, -2.5*ROOM_S + .1); scene.add(yp);   // back wall, left of the bookshelf
+    yp.position.set(-2.5*ROOM_S, 1.22*ROOM_S, -2.5*ROOM_S + .1); scene.add(yp);   // back wall, left of the bookshelf
     const frame = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.66), psxify(new THREE.MeshLambertMaterial({ color: 0xe8e8e8 })));
     frame.position.copy(yp.position); frame.position.z -= .02; scene.add(frame);
   });
