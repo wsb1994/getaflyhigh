@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fly Crib Sesh</title>
+<style>
+  :root { --bg:#0b0605; --ink:#f3e2c2; --accent:#ff6a2a; --muted:#a58a6a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family: Georgia, "Times New Roman", serif; overflow:hidden; }
+  canvas { display:block; } #gl { width:100vw !important; height:100vh !important; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:2; }
+  #panel { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); width:min(380px, calc(100% - 32px)); padding:14px; background:#140906cc; border:1px solid #5a3420; border-radius:14px; pointer-events:auto; backdrop-filter: blur(6px); text-align:center; }
+  #panel h1 { margin:0 0 10px; font-size:18px; font-weight:normal; letter-spacing:.06em; color:var(--ink); }
+  button { pointer-events:auto; cursor:pointer; font:inherit; font-size:18px; padding:14px 18px; border-radius:10px; border:1px solid var(--accent); background:linear-gradient(#6a2a10,#2a0d06); color:#ffd9b8; width:100%; transition:transform .08s, box-shadow .2s; box-shadow:0 0 18px #ff5a2a33; }
+  button:hover { box-shadow:0 0 28px #ff5a2a77; }
+  button:active { transform:scale(.96); }
+  #meter { height:10px; background:#2a1610; border-radius:5px; overflow:hidden; margin:12px 0 0; }
+  #meter > div { height:100%; width:0%; background:linear-gradient(90deg,#ff3c00,#ffb347,#fff0a0); transition:width .3s; }
+  #hint { position:absolute; left:16px; bottom:16px; font-size:12px; color:#7a5a44; }
+  #vignette { position:absolute; inset:0; background: radial-gradient(ellipse at center, transparent 55%, #000 130%); }
+  #radio { position:absolute; left:16px; top:16px; width:260px; pointer-events:auto; background:#140906cc; border:1px solid #5a3420; border-radius:12px; overflow:hidden; backdrop-filter: blur(6px); }
+  #radio .label { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#c9903a; padding:8px 12px 4px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  #radio .label b { font-weight:normal; cursor:pointer; color:#ffd9b8; border:1px solid #5a3420; border-radius:8px; padding:2px 8px; }
+  #track { padding:2px 12px 0; font-family: Impact, "Arial Black", sans-serif; font-size:16px; letter-spacing:.03em; color:#f3e2c2; }
+  #by { font-size:11px; color:#a58a6a; padding:2px 12px 8px; }
+  #eq { display:flex; align-items:flex-end; gap:3px; height:28px; padding:0 12px 10px; }
+  #eq i { display:block; flex:1; height:4px; background:#ff6a2a; border-radius:2px; opacity:.85; }
+  #brainbox { position:absolute; right:16px; bottom:16px; width:300px; height:230px; pointer-events:auto; background:#0a0612dd; border:1px solid #3a2a5a; border-radius:12px; overflow:hidden; backdrop-filter: blur(6px); }
+  #brainbox .label { position:absolute; left:0; right:0; top:0; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#b48cff; padding:8px 12px; display:flex; justify-content:space-between; }
+  #brainbox canvas { width:100%; height:100%; }
+  #baked { position:absolute; left:0; right:0; bottom:6px; text-align:center; font-family: Impact, "Arial Black", sans-serif; font-size:20px; letter-spacing:.04em; white-space:nowrap; opacity:0; pointer-events:none; z-index:5;
+    background-image: linear-gradient(90deg,#ff3b3b,#ffb03b,#fff23b,#3bff6a,#3bd8ff,#7b5bff,#ff3bd8,#ff3b3b); background-size:300% 100%;
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+    filter: drop-shadow(0 0 8px #fff8) drop-shadow(0 0 18px #ff5aff88); }
+  #baked.on { opacity:1; animation: rainbow 2.2s linear infinite, pulse 1.2s ease-in-out infinite; }
+  @keyframes rainbow { from { background-position:0% 0; } to { background-position:300% 0; } }
+  @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.55; transform:scale(1.05); } }
+  #pips { display:flex; justify-content:center; gap:8px; margin-top:8px; }
+  #pips i { width:10px; height:10px; border-radius:50%; background:#2a1610; border:1px solid #5a3420; display:block; }
+  #pips i.on { background:#ff6a2a; box-shadow:0 0 8px #ff6a2a; }
+  #combo { font-size:11px; color:#a58a6a; margin-top:6px; letter-spacing:.08em; text-transform:uppercase; }
+  @media (max-width:700px){ #hint{display:none;} #radio{width:200px;} #brainbox{width:180px;height:140px;} #baked{font-size:14px;} }
+</style>
+</head>
+<body>
+<div id="vignette"></div>
+<div id="hud">
+  <div id="radio">
+    <div class="label"><span>♫ TeamSESH · third puff</span><b id="radioPlay">▶ play</b></div>
+    <div id="track">IfYouHadAZuneIHateYou</div>
+    <div id="by">BONES ft. Spooky Black · starts on the third puff, then fades</div>
+    <div id="eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+  <div id="brainbox">
+    <div class="label"><span>Fly brain · live</span><span id="brainStat">0 synapses firing</span></div>
+    <canvas id="brainCanvas"></canvas>
+    <div id="baked"></div>
+  </div>
+  <div id="panel">
+    <h1>Fruit Fly Crib Sesh</h1>
+    <button id="puff">🍃 Press to give the fly a hit</button>
+    <div id="meter"><div></div></div>
+    <div id="pips"><i></i><i></i><i></i></div>
+    <div id="combo">three hits</div>
+  </div>
+  <div id="hint">drag to orbit · scroll to zoom</div>
+</div>
+
+<script>
+// Clip starts at the first bass hit and runs a long stretch of the song.
+// A plain audio element starts on the click. The Web Audio clock was firing
+// this seconds late.
+const PHRASE = 80, FADE = 6;
+const radioPlay = document.getElementById('radioPlay');
+const eqBars = [...document.querySelectorAll('#eq i')];
+// Two copies so a later third puff can start over at the first hit.
+// Different URLs keep the browser from sharing one playhead.
+const voices = [0, 1].map(i => {
+  const a = new Audio('assets/opening.mp3?n=' + i);
+  a.preload = 'auto';
+  a.addEventListener('error', () => { document.getElementById('by').textContent = 'could not load the track'; });
+  return a;
+});
+let voice = 0, fadeTimer = 0, runId = 0;
+const flyRadio = { eqBars, voices, get audio(){ return voices[(voice + 1) % 2]; }, playing: false, level: 0, ready: true };
+window.flyRadio = flyRadio;
+function stopSting(){
+  runId++;
+  voices.forEach(a => a.pause());
+  flyRadio.playing = false;
+  flyRadio.level = 0;
+  clearInterval(fadeTimer);
+  radioPlay.textContent = '▶ play';
+}
+function playSting(){
+  const next = voices[voice];
+  voice = (voice + 1) % 2;
+  voices[voice].pause();
+  try { next.pause(); next.currentTime = 0; } catch (e) {}
+  next.volume = 1;
+  flyRadio.playing = true;
+  flyRadio.level = 1;
+  radioPlay.textContent = '❚❚ pause';
+  const my = ++runId;
+  const started = performance.now();
+  clearInterval(fadeTimer);
+  fadeTimer = setInterval(() => {
+    if (my !== runId) return;
+    const e = (performance.now() - started) / 1000;
+    if (e >= PHRASE) { stopSting(); return; }
+    const fadeStart = PHRASE - FADE;
+    const vol = e < fadeStart ? 1 : Math.max(0, 1 - (e - fadeStart) / FADE);
+    next.volume = vol;
+    flyRadio.level = vol;
+  }, 40);
+  const pending = next.play();
+  if (pending) pending.catch(err => console.error(err));
+}
+function toggleRadio(){ if (flyRadio.playing) stopSting(); else playSting(); }
+radioPlay.onclick = (ev) => { ev.stopPropagation(); toggleRadio(); };
+</script>
+
+<script src="assets/fly_model.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+// ---------- renderer / scene ----------
+// PS1 look: render into a tiny buffer and let the browser upscale it with no smoothing
+const PSX_H = 240;
+const psxW = () => Math.round(PSX_H * innerWidth / innerHeight), psxH = () => PSX_H;
+const renderer = new THREE.WebGLRenderer({ antialias:false });
+renderer.domElement.id = 'gl';
+renderer.setPixelRatio(1);
+renderer.setSize(psxW(), psxH(), false);
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.shadowMap.enabled = false;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x1a0c14, 0.022);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(3.4, 3.4, 5.2);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(-0.3, 1.6, -2.4);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI/2 - 0.03;
+controls.minDistance = 3; controls.maxDistance = 18;
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(psxW(), psxH()), 0.35, 0.6, 0.35);
+composer.addPass(bloom);
+// 15-bit colour with an ordered dither, like the console's output
+const ditherPass = new ShaderPass({
+  uniforms: { tDiffuse:{ value:null }, res:{ value:new THREE.Vector2(psxW(), psxH()) } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 res; varying vec2 vUv;
+    const mat4 bayer = mat4(0.,8.,2.,10., 12.,4.,14.,6., 3.,11.,1.,9., 15.,7.,13.,5.);
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      ivec2 p = ivec2(mod(floor(vUv*res), 4.0));
+      float d = (bayer[p.x][p.y] / 16.0 - 0.5) / 31.0;
+      gl_FragColor = vec4(floor((c + d) * 31.0 + 0.5) / 31.0, 1.0);
+    }`
+});
+composer.addPass(ditherPass);
+// vertex snapping: positions land on a coarse grid so edges wobble like the PS1's integer rasteriser
+function psxify(mat){
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+      { vec2 grid = vec2(${(160).toFixed(1)}, ${(120).toFixed(1)});
+        gl_Position.xy = floor(gl_Position.xy / gl_Position.w * grid + 0.5) / grid * gl_Position.w; }`);
+  };
+  mat.needsUpdate = true; return mat;
+}
+
+// ---------- the shadow realm outside the den ----------
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite:false, fog:false,
+  uniforms: { t:{ value:0 } },
+  vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform float t; varying vec3 vDir;
+    vec3 hash3(vec3 p){ p=vec3(dot(p,vec3(127.1,311.7,74.7)),dot(p,vec3(269.5,183.3,246.1)),dot(p,vec3(113.5,271.9,124.6))); return -1.0+2.0*fract(sin(p)*43758.5453123); }
+    float noise(vec3 p){ vec3 i=floor(p), f=fract(p); vec3 u=f*f*(3.0-2.0*f);
+      return mix(mix(mix(dot(hash3(i+vec3(0,0,0)),f-vec3(0,0,0)),dot(hash3(i+vec3(1,0,0)),f-vec3(1,0,0)),u.x),
+                     mix(dot(hash3(i+vec3(0,1,0)),f-vec3(0,1,0)),dot(hash3(i+vec3(1,1,0)),f-vec3(1,1,0)),u.x),u.y),
+                 mix(mix(dot(hash3(i+vec3(0,0,1)),f-vec3(0,0,1)),dot(hash3(i+vec3(1,0,1)),f-vec3(1,0,1)),u.x),
+                     mix(dot(hash3(i+vec3(0,1,1)),f-vec3(0,1,1)),dot(hash3(i+vec3(1,1,1)),f-vec3(1,1,1)),u.x),u.y),u.z); }
+    float fbm(vec3 p){ float v=0.0, a=0.5; for(int i=0;i<5;i++){ v+=a*noise(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=0.5; } return v; }
+    void main(){
+      vec3 d = vDir;
+      // swirl around the vertical axis, faster near the horizon, like the void behind a 90s boss arena
+      float ang = atan(d.z, d.x) + t*0.08 + 2.5*(1.0-abs(d.y));
+      vec3 q = vec3(cos(ang)*1.6, d.y*2.2 + t*0.05, sin(ang)*1.6);
+      float n1 = fbm(q*1.3 + vec3(0.0, t*0.03, 0.0));
+      float n2 = fbm(q*3.1 - vec3(t*0.05, 0.0, t*0.02) + n1*1.8);
+      float bands = 0.5 + 0.5*sin(ang*3.0 + n2*6.0 + t*0.4);
+      vec3 purple = vec3(0.22,0.05,0.38), violet = vec3(0.45,0.12,0.62), teal = vec3(0.05,0.35,0.40), black = vec3(0.01,0.0,0.03);
+      vec3 col = mix(black, purple, smoothstep(-0.2, 0.5, n1));
+      col = mix(col, violet, smoothstep(0.25, 0.75, n2) * bands * 0.9);
+      col = mix(col, teal, smoothstep(0.55, 0.9, fbm(q*2.0 + vec3(t*0.02))) * 0.6);
+      // ghostly drifting eyes/sparks in the dark
+      float sp = smoothstep(0.985, 1.0, noise(q*18.0 + t*0.3));
+      col += vec3(0.7,0.4,1.0) * sp * 1.5;
+      col *= 1.0 - 0.35*smoothstep(-0.2, -0.9, d.y); // darker straight below
+      gl_FragColor = vec4(col, 1.0);
+    }`
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(120, 48, 32), skyMat); scene.add(sky);
+
+// ---------- procedural textures ----------
+function woodTexture(){
+  const c = document.createElement('canvas'); c.width=c.height=512;
+  const g = c.getContext('2d');
+  g.fillStyle='#3a1f10'; g.fillRect(0,0,512,512);
+  for(let i=0;i<220;i++){
+    g.strokeStyle=`rgba(${60+Math.random()*40},${25+Math.random()*20},${10+Math.random()*10},${0.25+Math.random()*0.4})`;
+    g.lineWidth=1+Math.random()*3; g.beginPath();
+    const y=Math.random()*512; g.moveTo(0,y);
+    for(let x=0;x<=512;x+=32) g.lineTo(x, y+Math.sin(x*0.02+i)*4);
+    g.stroke();
+  }
+  for(let i=0;i<6;i++){ g.fillStyle='rgba(0,0,0,.35)'; g.fillRect(0, i*85, 512, 2); }
+  const t = new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+function rugTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=512; const g=c.getContext('2d');
+  g.fillStyle='#6b1a14'; g.fillRect(0,0,512,512);
+  g.strokeStyle='#c9903a'; g.lineWidth=6; g.strokeRect(24,24,464,464); g.strokeRect(60,60,392,392);
+  g.fillStyle='#8a2a1c';
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){ if((x+y)%2) continue; g.beginPath(); g.moveTo(90+x*42,90+y*42+21); g.lineTo(90+x*42+21,90+y*42); g.lineTo(90+x*42+42,90+y*42+21); g.lineTo(90+x*42+21,90+y*42+42); g.closePath(); g.fill(); }
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+function softTexture(inner, mid){
+  const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');
+  const r=g.createRadialGradient(64,64,0,64,64,64);
+  r.addColorStop(0,`rgba(255,255,255,${inner})`); r.addColorStop(0.4,`rgba(255,255,255,${mid})`); r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=r; g.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+const smokeTex = softTexture(.5,.18), glowTex = softTexture(1,.55);
+
+// ---------- the crib: a PS1 living room assembled in Blender from CC0 kits (assets/room.glb) ----------
+const ROOM_S = 3;                       // the kit is in metres; the fly is a big fly
+const roomGroup = new THREE.Group(); roomGroup.scale.setScalar(ROOM_S); scene.add(roomGroup);
+const cjAttach = {};                    // cj_hand / cj_mouth / cj_head empties from Blender
+let cjMesh = null, tvScreenMat = null, lavaMat = null;
+function pixelTex(t){ if (!t) return t; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.anisotropy = 1; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; }
+new GLTFLoader().load('assets/room.glb', (g) => {
+  g.scene.traverse(o => {
+    if (o.name.startsWith('cj_') && !o.isMesh) { cjAttach[o.name] = o; return; }
+    if (!o.isMesh) return;
+    if (o.name === 'cj') cjMesh = o;
+    const src = o.material; const n = src.name || '';
+    const m = new THREE.MeshLambertMaterial({ color: src.color ? src.color.clone() : 0xffffff, map: pixelTex(src.map), transparent: !!src.transparent && n !== 'cj_hair', opacity: src.opacity ?? 1, side: THREE.FrontSide });
+    if (n.startsWith('lavalamp_lamp')) { m.emissive.set(0xc020c0); m.emissiveIntensity = .9; lavaMat = m; }
+    if (n.startsWith('tv_metalDark') || n === 'metalDark') { m.emissive.set(0x3060a0); m.emissiveIntensity = .5; tvScreenMat = m; }
+    if (n === 'glass' || n.startsWith('rwall') && n.includes('glass')) { m.transparent = true; m.opacity = .18; m.color.set(0x9fd0ff); }
+    o.material = psxify(m);
+  });
+  roomGroup.add(g.scene);
+  hangPosters();
+  cjBlunt.visible = true;
+});
+
+// posters on the back wall (canvas textures, drawn small so they stay crunchy)
+function posterTex(lines, bg, fg, w=64, h=96){
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0,0,w,h); g.strokeStyle = fg; g.lineWidth = 2; g.strokeRect(2,2,w-4,h-4);
+  g.fillStyle = fg; g.font = 'bold 15px Impact, "Arial Black", sans-serif'; g.textAlign = 'center';
+  lines.forEach((l,i) => g.fillText(l, w/2, 28 + i*22));
+  const t = new THREE.CanvasTexture(c); return pixelTex(t);
+}
+function hangPosters(){
+  // back wall is at kit y=+2.5 -> three z = -2.5*ROOM_S; walls face -z
+  const specs = [
+    [-1.6, [ 'WEST', 'SIDE', '★' ], '#1b0a2a', '#e8d27a'],
+    [ 0.2, [ 'DOGGY', 'STYLE', '1993' ], '#0d2a14', '#9fe07a'],
+    [ 1.4, [ 'G', 'FUNK', 'ERA' ], '#2a0d1a', '#ff7ac8'],
+  ];
+  for (const [x, lines, bg, fg] of specs) {
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), psxify(new THREE.MeshLambertMaterial({ map: posterTex(lines, bg, fg) })));
+    p.position.set(x*ROOM_S, 1.75*ROOM_S, -2.5*ROOM_S + .1); scene.add(p);
+  }
+  // a poster of the lowrider on the left wall, facing +x
+  const lp = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), psxify(new THREE.MeshLambertMaterial({ map: posterTex(['LOW', 'RIDER'], '#101a3a', '#ffd25a', 96, 64) })));
+  lp.rotation.y = Math.PI/2; lp.position.set(-3*ROOM_S + .1, 1.8*ROOM_S, 1.2*ROOM_S); scene.add(lp);
+}
+
+// lights: a warm overhead, the lava lamp, the TV, the void leaking in through the windows
+scene.add(new THREE.AmbientLight(0x7a5a8a, 2.2));
+scene.add(new THREE.HemisphereLight(0x9a6ac0, 0x2a1418, 1.6));
+const ceilLight = new THREE.PointLight(0xffc890, 160, 40, 2); ceilLight.position.set(0, 7.2, -3); scene.add(ceilLight);
+const couchLight = new THREE.PointLight(0xffd0a0, 40, 14, 2); couchLight.position.set(-1.5, 4.0, -1.5); scene.add(couchLight);
+const lavaLight = new THREE.PointLight(0xd040e0, 25, 12, 2); lavaLight.position.set(-2.3*ROOM_S, 2.2, -2.0*ROOM_S); scene.add(lavaLight);
+const tvLight = new THREE.PointLight(0x4080ff, 12, 9, 2); tvLight.position.set(-2.2*ROOM_S, 1.9, 0.6*ROOM_S); scene.add(tvLight);
+const fillLight = new THREE.PointLight(0xffb070, 30, 14, 2); fillLight.position.set(3.5, 3.6, 2.5); scene.add(fillLight);
+const rimLight = new THREE.PointLight(0x8a5aff, 10, 12, 2); rimLight.position.set(-2.5, 3.5, -5.5); scene.add(rimLight);
+const candleLight = { intensity: 0 };   // the den's candles are gone; kept so the loop still runs
+const lanternLights = [];
+
+// a tiny Zune on the table. the song is named for one.
+function zuneTexture(){
+  const c = document.createElement('canvas'); c.width = 128; c.height = 180;
+  const g = c.getContext('2d');
+  g.fillStyle = '#06140c'; g.fillRect(0, 0, 128, 180);
+  g.strokeStyle = '#39ff8a'; g.lineWidth = 3; g.strokeRect(6, 6, 116, 168);
+  g.fillStyle = '#39ff8a'; g.font = 'bold 28px sans-serif'; g.fillText('ZUNE', 22, 48);
+  g.font = '14px sans-serif'; g.fillText('BONES', 36, 88);
+  g.fillText('REPEAT', 26, 112);
+  g.fillText('▶ ▶ ▶', 32, 146);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const zune = new THREE.Group();
+const zuneBody = new THREE.Mesh(new THREE.BoxGeometry(.22, .32, .045), new THREE.MeshStandardMaterial({ color:0x1a1a1a, roughness:.35, metalness:.45 }));
+zuneBody.castShadow = true; zune.add(zuneBody);
+const zuneScreen = new THREE.Mesh(new THREE.PlaneGeometry(.18, .26), new THREE.MeshBasicMaterial({ map:zuneTexture() }));
+zuneScreen.position.z = .024; zune.add(zuneScreen);
+zune.position.set(1.0, 0.37*ROOM_S + .16, -0.55*ROOM_S); zune.rotation.y = -.5; zune.rotation.z = .08; scene.add(zune);
+
+// ---------- THE FLY (sculpted model, assets/fly.glb) ----------
+const fly = new THREE.Group();
+const FLY_Y = 0.41*ROOM_S;              // couch seat height
+fly.position.set(-0.45*ROOM_S, FLY_Y, -1.5*ROOM_S); fly.rotation.y = -.55; scene.add(fly);
+let eyeMat = null, wingMesh = null, headMesh = null;
+const headLocal = new THREE.Vector3(0, .55, .8);     // updated from the eye mesh once loaded
+const mouthLocal = new THREE.Vector3(0, .3, .9);
+const flyBytes = Uint8Array.from(atob(window.FLY_GLB_B64), ch => ch.charCodeAt(0)).buffer;
+new GLTFLoader().parse(flyBytes, '', (g) => {
+  const m = g.scene;
+  const box = new THREE.Box3().setFromObject(m); const size = box.getSize(new THREE.Vector3());
+  const s = 2.2 / Math.max(size.x, size.y, size.z); m.scale.setScalar(s);
+  box.setFromObject(m); m.position.y -= box.min.y;                     // stand on the cushion
+  m.updateMatrixWorld(true);
+  m.traverse(o => {
+    if (!o.isMesh) return;
+    o.castShadow = o.receiveShadow = true;
+    const name = (o.material && o.material.name) || '';
+    if (name === 'eye') { eyeMat = o.material = new THREE.MeshPhysicalMaterial({ color:0x8a1010, roughness:.2, clearcoat:1, clearcoatRoughness:.15, emissive:0x400000, emissiveIntensity:.5 }); const eb=new THREE.Box3().setFromObject(o); eb.getCenter(headLocal); headLocal.y += .05; mouthLocal.copy(headLocal); mouthLocal.y -= .28; mouthLocal.z += .15; headMesh = o; }
+    else if (name === 'wing') { wingMesh = o; o.material = new THREE.MeshPhysicalMaterial({ color:0xd8e4ff, transparent:true, opacity:.32, roughness:.15, side:THREE.DoubleSide, iridescence:.9, iridescenceIOR:1.35, depthWrite:false }); o.castShadow=false; }
+    else if (name === 'chitin' || name === 'head') { o.material = new THREE.MeshPhysicalMaterial({ color:0x2a1c10, roughness:.42, metalness:.25, clearcoat:.5, clearcoatRoughness:.35, sheen:.4, sheenColor:new THREE.Color(0x4a6a3a) }); }
+    else { o.material = new THREE.MeshStandardMaterial({ color:0x15100a, roughness:.5, metalness:.2 }); }
+    psxify(o.material);
+  });
+  fly.add(m);
+  placeBlunt();
+  addCans();
+}, (err) => console.error('fly model failed to parse', err));
+// the blunt: a fat hand-rolled cone at the fly's mouth, cherry at the far end
+function makeBlunt(len=.55, r=.045){
+  const g = new THREE.Group();
+  const paper = new THREE.Mesh(new THREE.CylinderGeometry(r, r*.7, len, 8), psxify(new THREE.MeshLambertMaterial({ color:0x6b4a2a })));
+  paper.rotation.z = Math.PI/2; paper.position.x = len/2; g.add(paper);
+  const ash = new THREE.Mesh(new THREE.CylinderGeometry(r*.95, r*.85, len*.12, 8), psxify(new THREE.MeshLambertMaterial({ color:0x8a8a86 })));
+  ash.rotation.z = Math.PI/2; ash.position.x = len*1.0; g.add(ash);
+  const ember = new THREE.Mesh(new THREE.SphereGeometry(r*.9, 8, 6), new THREE.MeshBasicMaterial({ color:0xff6a10 })); ember.position.x = len*1.08; g.add(ember);
+  const light = new THREE.PointLight(0xff5a10, 1, 3, 2); light.position.copy(ember.position); g.add(light);
+  g.userData = { ember, light }; return g;
+}
+const pipe = makeBlunt(.6, .05);                 // the fly's
+const bowl = pipe.userData.ember, ember = pipe.userData.ember, emberLight = pipe.userData.light;
+fly.add(pipe);
+function placeBlunt(){ pipe.position.copy(mouthLocal); pipe.rotation.set(0, .55, -.15); }
+// CJ's blunt sits in his raised hand; the empty from Blender marks the hand
+const cjBlunt = makeBlunt(.16/ROOM_S*ROOM_S, .014); cjBlunt.visible = false; scene.add(cjBlunt);
+const cjHandW = new THREE.Vector3(), cjMouthW = new THREE.Vector3(), cjEmberW = new THREE.Vector3();
+// cans over the eyes, so the fly is listening rather than being wired up
+function addCans(){
+  const cans = new THREE.Group();
+  const shell = new THREE.MeshStandardMaterial({ color:0x141414, roughness:.35, metalness:.7 });
+  const pad = new THREE.MeshStandardMaterial({ color:0x7a1830, roughness:.8 });
+  for (const side of [-1, 1]) {
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(.11, .11, .07, 16), shell);
+    cup.rotation.z = Math.PI / 2; cup.position.set(side * .28, 0, 0); cup.castShadow = true; cans.add(cup);
+    const cushion = new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .02, 16), pad);
+    cushion.rotation.z = Math.PI / 2; cushion.position.set(side * .24, 0, 0); cans.add(cushion);
+  }
+  const band = new THREE.Mesh(new THREE.TorusGeometry(.26, .018, 8, 24, Math.PI), shell);
+  band.rotation.y = Math.PI / 2; band.rotation.z = Math.PI; band.position.y = .08; cans.add(band);
+  cans.position.copy(headLocal); cans.position.y += .05; fly.add(cans);
+}
+const bowlWorld = new THREE.Vector3(), headWorld = new THREE.Vector3(), mouthWorld = new THREE.Vector3();
+
+// ---------- the fake brain (corner viewport) ----------
+// A random point cloud with a colour wash. Not a connectome, not a neuron model.
+const N = 2600, E = 1800;
+const nPos = new Float32Array(N*3), nCol = new Float32Array(N*3), nHeat = new Float32Array(N), nRad = new Float32Array(N), nFired = new Uint8Array(N), nNext = new Uint8Array(N), nWasHot = new Uint8Array(N);
+const lobes = [[-.55,0,0,.7],[.55,0,0,.7],[0,.1,-.45,.55],[0,-.25,.3,.45]];
+for (let i=0;i<N;i++){
+  const L = lobes[i%lobes.length];
+  const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1), r=Math.cbrt(Math.random())*L[3];
+  nPos.set([L[0]+r*Math.sin(ph)*Math.cos(th), L[1]+r*Math.sin(ph)*Math.sin(th)*.85, L[2]+r*Math.cos(ph)], i*3);
+  nRad[i] = Math.hypot(nPos[i*3], nPos[i*3+1], nPos[i*3+2]);
+}
+const ePos = new Float32Array(E*6), eCol = new Float32Array(E*6), eIdx = new Int32Array(E*2);
+let e=0, tries=0;
+while (e<E && tries<E*60){
+  tries++; const a=Math.floor(Math.random()*N), b=Math.floor(Math.random()*N);
+  const dx=nPos[a*3]-nPos[b*3], dy=nPos[a*3+1]-nPos[b*3+1], dz=nPos[a*3+2]-nPos[b*3+2];
+  if (dx*dx+dy*dy+dz*dz > .14) continue;
+  ePos.set([nPos[a*3],nPos[a*3+1],nPos[a*3+2],nPos[b*3],nPos[b*3+1],nPos[b*3+2]], e*6); eIdx[e*2]=a; eIdx[e*2+1]=b; e++;
+}
+const brainCanvas = document.getElementById('brainCanvas');
+const brainRenderer = new THREE.WebGLRenderer({ canvas:brainCanvas, antialias:true, alpha:true });
+brainRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const brainScene = new THREE.Scene();
+const brainCam = new THREE.PerspectiveCamera(40, 300/230, .1, 20); brainCam.position.set(0,.6,3.1); brainCam.lookAt(0,0,0);
+const brain = new THREE.Group(); brainScene.add(brain);
+const nGeo = new THREE.BufferGeometry();
+nGeo.setAttribute('position', new THREE.BufferAttribute(nPos,3));
+nGeo.setAttribute('color', new THREE.BufferAttribute(nCol,3));
+const neurons = new THREE.Points(nGeo, new THREE.PointsMaterial({ size:.05, vertexColors:true, map:glowTex, transparent:true, opacity:.95, depthWrite:false, blending:THREE.AdditiveBlending }));
+brain.add(neurons);
+const eGeo = new THREE.BufferGeometry();
+eGeo.setAttribute('position', new THREE.BufferAttribute(ePos,3));
+eGeo.setAttribute('color', new THREE.BufferAttribute(eCol,3));
+brain.add(new THREE.LineSegments(eGeo, new THREE.LineBasicMaterial({ vertexColors:true, transparent:true, opacity:.7, blending:THREE.AdditiveBlending, depthWrite:false })));
+const brainStat = document.getElementById('brainStat');
+// a little puff of smoke that rolls across the brain readout on every puff
+const BS = 400, bsPos = new Float32Array(BS*3).fill(-100), bsCol = new Float32Array(BS*3), bsVel = new Float32Array(BS*3), bsLife = new Float32Array(BS).fill(-1), bsMax = new Float32Array(BS);
+const bsGeo = new THREE.BufferGeometry(); bsGeo.setAttribute('position', new THREE.BufferAttribute(bsPos,3)); bsGeo.setAttribute('color', new THREE.BufferAttribute(bsCol,3));
+const brainSmoke = new THREE.Points(bsGeo, new THREE.PointsMaterial({ map:smokeTex, size:1.1, vertexColors:true, transparent:true, opacity:.55, depthWrite:false }));
+brainSmoke.frustumCulled = false; brainScene.add(brainSmoke);
+let bsHead = 0;
+function brainPuff(){
+  for (let k=0;k<90;k++){ const i=bsHead; bsHead=(bsHead+1)%BS;
+    bsPos.set([-1.9+Math.random()*.3, -1.1+Math.random()*.4, .6+Math.random()*.4], i*3);
+    bsVel.set([.7+Math.random()*.5, .35+Math.random()*.3, (Math.random()-.5)*.2], i*3);
+    bsLife[i]=0; bsMax[i]=2.5+Math.random()*2; }
+}
+function stepBrainSmoke(dt, t){
+  for (let i=0;i<BS;i++){ if (bsLife[i]<0) continue; bsLife[i]+=dt; if (bsLife[i]>bsMax[i]){ bsLife[i]=-1; bsPos[i*3+1]=-100; continue; }
+    const l=bsLife[i]/bsMax[i]; bsVel[i*3]*=1-dt*.5; bsVel[i*3+1]+=Math.sin(t*1.3+i)*dt*.15;
+    bsPos[i*3]+=bsVel[i*3]*dt; bsPos[i*3+1]+=bsVel[i*3+1]*dt; bsPos[i*3+2]+=bsVel[i*3+2]*dt;
+    const f=(1-l)*Math.min(1,l*5)*.8; bsCol[i*3]=.8*f; bsCol[i*3+1]=.7*f; bsCol[i*3+2]=.75*f; }
+  bsGeo.attributes.position.needsUpdate=true; bsGeo.attributes.color.needsUpdate=true;
+}
+function sizeBrain(){ const r=brainCanvas.getBoundingClientRect(); brainRenderer.setSize(r.width, r.height, false); brainCam.aspect=r.width/r.height; brainCam.updateProjectionMatrix(); }
+sizeBrain();
+
+// ---------- particle systems ----------
+function makeSystem(count, tex, size, blending, opacity){
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count*3).fill(-100), col = new Float32Array(count*3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+  const mat = new THREE.PointsMaterial({ map:tex, size, vertexColors:true, transparent:true, opacity, depthWrite:false, blending });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled=false; scene.add(pts);
+  return { count, geo, pos, col, base:new Float32Array(count*3), vel:new Float32Array(count*3), life:new Float32Array(count).fill(-1), maxLife:new Float32Array(count), head:0, mat };
+}
+function emit(S, x,y,z, vx,vy,vz, life, r,g,b){
+  const i = S.head; S.head = (S.head+1)%S.count;
+  S.pos.set([x,y,z], i*3); S.vel.set([vx,vy,vz], i*3); S.life[i]=0; S.maxLife[i]=life; S.base.set([r,g,b], i*3);
+}
+function step(S, dt, force, fade){
+  for (let i=0;i<S.count;i++){
+    if (S.life[i] < 0) continue;
+    S.life[i] += dt;
+    if (S.life[i] > S.maxLife[i]) { S.life[i] = -1; S.pos[i*3+1] = -100; continue; }
+    const l = S.life[i]/S.maxLife[i];
+    force(i,l);
+    S.pos[i*3]+=S.vel[i*3]*dt; S.pos[i*3+1]+=S.vel[i*3+1]*dt; S.pos[i*3+2]+=S.vel[i*3+2]*dt;
+    const f = fade(i,l);
+    S.col[i*3]=S.base[i*3]*f; S.col[i*3+1]=S.base[i*3+1]*f; S.col[i*3+2]=S.base[i*3+2]*f;
+  }
+  S.geo.attributes.position.needsUpdate = true; S.geo.attributes.color.needsUpdate = true;
+}
+const smoke = makeSystem(1500, smokeTex, .7, THREE.NormalBlending, .35);
+const fire  = makeSystem(3000, glowTex, .16, THREE.AdditiveBlending, 1);
+const sparks= makeSystem(7000, glowTex, .09, THREE.AdditiveBlending, 1);
+const tmpC = new THREE.Color();
+
+// ---------- state ----------
+let dose = 0, doseTarget = 0, torch = 0, fireworkTimer = 0, wingPhase = 0;
+const btn = document.getElementById('puff'), meter = document.querySelector('#meter > div');
+let seedBurst = 0, bakedTimer = null, listen = 0, puffCount = 0, bakedHold = 0;
+const BAKED_FOR = 26;
+const PHRASES = ['Certified Baked', 'Fly High', 'Addicted!'];
+const baked = document.getElementById('baked');
+const pips = [...document.querySelectorAll('#pips i')];
+function showPhrase(text){
+  baked.textContent = text;
+  baked.classList.add('on');
+  clearTimeout(bakedTimer);
+  bakedTimer = setTimeout(() => baked.classList.remove('on'), BAKED_FOR * 1000);
+}
+btn.addEventListener('click', () => {
+  doseTarget = Math.min(1, doseTarget + .4); torch = 1; seedBurst = 1; fireworks(true);
+  brainPuff();
+  puffCount++;
+  const step = puffCount % 3;
+  pips.forEach((pip, i) => pip.classList.toggle('on', step === 0 ? true : i < step));
+  if (step === 0) {
+    playSting();
+    showPhrase(PHRASES[(puffCount / 3 - 1) % PHRASES.length]);
+    bakedHold = BAKED_FOR;
+    for (let k = 0; k < 1800; k++) nHeat[(k * 97) % N] = 1;
+  }
+});
+
+function fireworks(big){
+  fly.localToWorld(headWorld.copy(headLocal));
+  const n = big ? 260 : 80, hue = Math.random();
+  for (let k=0;k<n;k++){
+    const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1), sp=(big?2.4:1.6)*(.6+Math.random()*.6);
+    tmpC.setHSL((hue + (Math.random()<.5?0:.5) + Math.random()*.08)%1, 1, .6);
+    emit(sparks, headWorld.x, headWorld.y+.1, headWorld.z, Math.sin(ph)*Math.cos(th)*sp, Math.abs(Math.sin(ph)*Math.sin(th))*sp+1.5, Math.cos(ph)*sp, 1.4+Math.random()*1.2, tmpC.r,tmpC.g,tmpC.b);
+  }
+}
+
+const clock = new THREE.Clock();
+const v3 = new THREE.Vector3();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+  skyMat.uniforms.t.value = t;
+
+  doseTarget = Math.max(0, doseTarget - dt*.03);
+  dose += (doseTarget - dose) * dt * 1.5;
+  torch = Math.max(0, torch - dt*.35);
+  meter.style.width = (dose*100).toFixed(0)+'%';
+  const glow = Math.min(1, dose + torch*.6);
+
+  // nod along while the opening is actually sounding
+  listen = 0;
+  const radio = window.flyRadio;
+  if (radio.playing) {
+    listen = radio.level || 0;
+    radio.eqBars.forEach((bar, i) => {
+      const wobble = 0.35 + 0.65 * Math.abs(Math.sin(t * 28 + i * 0.7));
+      bar.style.height = (4 + listen * wobble * 24) + 'px';
+    });
+  } else radio.eqBars.forEach(bar => { bar.style.height = '4px'; });
+
+  // --- the fly reacts ---
+  fly.position.y = FLY_Y + Math.sin(t*(2+glow*20))*.01*glow*glow + torch*.03*Math.sin(t*40) + listen * .12;
+  fly.rotation.z = Math.sin(t*1.3)*.04*glow + torch*.05*Math.sin(t*33);
+  fly.rotation.x = Math.sin(t*.9)*.05*glow;
+  wingPhase += dt*(1.5 + glow*60);
+  if (wingMesh) wingMesh.rotation.x = Math.sin(wingPhase)*(.02 + glow*.18);
+  if (eyeMat) { eyeMat.emissiveIntensity = .5 + glow*4; eyeMat.emissive.setHSL(.01, 1, .2+glow*.35); }
+  ember.material.color.setHSL(.05, 1, .35 + torch*.3);
+  emberLight.intensity = 1 + torch*10;
+  fly.localToWorld(headWorld.copy(headLocal));
+
+  // --- neurons: activity starts in the central lobes and cascades outward along synapses ---
+  seedBurst = Math.max(0, seedBurst - dt*.6);
+  const holding = bakedHold > 0;
+  if (holding) bakedHold = Math.max(0, bakedHold - dt);
+  const seedRate = glow*glow*90 + seedBurst*400;          // central seeds per second
+  for (let k=0; k<seedRate*dt; k++){ const i=Math.floor(Math.random()*N); if (nRad[i] < .25) nHeat[i] = 1; }
+  // propagate: a neuron that just fired pushes its partners over threshold next frame
+  for (let k=0;k<E;k++){
+    const a=eIdx[k*2], b=eIdx[k*2+1];
+    if (nFired[a] && nHeat[b] < .2 && Math.random() < .55 + glow*.4) nNext[b] = 1;
+    if (nFired[b] && nHeat[a] < .2 && Math.random() < .55 + glow*.4) nNext[a] = 1;
+  }
+  let firing = 0;
+  const decayK = holding ? 0.35 : (3.2 - glow*2.0);
+  for (let i=0;i<N;i++){
+    let h = nHeat[i];
+    nFired[i] = 0;
+    if (nNext[i]) { h = 1; nNext[i] = 0; }
+    if (h >= 1 && !nWasHot[i]) nFired[i] = 1;            // fresh spike: will recruit partners next frame
+    nWasHot[i] = h >= 1 ? 1 : 0;
+    h *= (1 - dt*decayK);
+    if (holding && h < .9 && firing < 1600) h = 1;       // stay lit past a thousand while the line is up
+    if (h < .02) h = 0;
+    nHeat[i]=h; if (h > .6) firing++;
+    tmpC.setHSL(.78 - h*.7, 1, .12 + h*.55);
+    nCol[i*3]=tmpC.r; nCol[i*3+1]=tmpC.g; nCol[i*3+2]=tmpC.b;
+    if (nFired[i] && nRad[i] > .55 && Math.random() < glow*.06){   // outer-shell spikes spit fire out of the fly's head
+      v3.set(nPos[i*3],nPos[i*3+1],nPos[i*3+2]).normalize();
+      const sp = .5 + torch*.8 + Math.random()*.4;
+      emit(fire, headWorld.x+v3.x*.3, headWorld.y+v3.y*.3, headWorld.z+v3.z*.3, v3.x*sp+(Math.random()-.5)*.2, Math.abs(v3.y)*sp+.6, v3.z*sp+(Math.random()-.5)*.2, .3+Math.random()*.3, 1,.75,.2);
+    }
+  }
+  nGeo.attributes.color.needsUpdate = true;
+  for (let k=0;k<E;k++){ const h=Math.max(nHeat[eIdx[k*2]], nHeat[eIdx[k*2+1]]); tmpC.setHSL(.78-h*.7,1,.06+h*.5); eCol.set([tmpC.r,tmpC.g,tmpC.b,tmpC.r,tmpC.g,tmpC.b], k*6); }
+  eGeo.attributes.color.needsUpdate = true;
+  neurons.material.size = .05 + glow*.05;
+  brain.rotation.y = t*.35; brain.rotation.x = Math.sin(t*.4)*.2;
+  brainStat.textContent = `${firing} synapses firing`;
+  stepBrainSmoke(dt, t);
+  bloom.strength = .45 + glow*.25 + torch*.2;
+
+  // --- smoke: a small wisp curling up from the fly's mouth, a little more right after a puff ---
+  fly.localToWorld(mouthWorld.copy(mouthLocal));
+  const wisp = .6 + glow*2 + torch*6;
+  for (let k=0;k<wisp;k++)
+    emit(smoke, mouthWorld.x+(Math.random()-.5)*.06, mouthWorld.y+.02, mouthWorld.z+(Math.random()-.5)*.06, (Math.random()-.5)*.12, .25+Math.random()*.2, (Math.random()-.5)*.12, 1.6+Math.random()*1.4, .85,.8,.75);
+  bowl.getWorldPosition(bowlWorld);
+  if (Math.random() < .3 + torch)
+    emit(smoke, bowlWorld.x, bowlWorld.y+.12, bowlWorld.z, (Math.random()-.5)*.08, .2+Math.random()*.15, (Math.random()-.5)*.08, 1.2+Math.random(), .8,.7,.65);
+  fireworkTimer -= dt;
+  if (glow > .35 && fireworkTimer <= 0){ fireworks(false); fireworkTimer = .9 + (1-glow)*2.5; }
+
+  step(smoke, dt, (i)=>{ smoke.vel[i*3]+=Math.sin(t*1.1+i)*dt*.12; smoke.vel[i*3+2]+=Math.cos(t*.9+i*1.7)*dt*.12; smoke.vel[i*3+1]*=1-dt*.2; }, (i,l)=> (1-l)*Math.min(1,l*4)*.7);
+  step(fire, dt, (i)=>{ fire.vel[i*3+1]+=dt*1.5; }, (i,l)=>{ tmpC.setHSL(.12-l*.12, 1, .7-l*.5); fire.base[i*3]=tmpC.r; fire.base[i*3+1]=tmpC.g; fire.base[i*3+2]=tmpC.b; return 1; });
+  step(sparks, dt, (i)=>{ sparks.vel[i*3+1]-=dt*3.2; for(let a=0;a<3;a++) sparks.vel[i*3+a]*=1-dt*1.2; }, (i,l)=> Math.sqrt(1-l)*(l>.6 ? (Math.sin(t*40+i)>0?1:.2) : 1));
+  smoke.mat.opacity = .3 + glow*.1; smoke.mat.size = .5 + glow*.3;
+
+  // the crib breathes: TV static flicker, lava lamp slow pulse, CJ takes a hit now and then
+  tvLight.intensity = 10 + Math.random()*6;
+  if (tvScreenMat) tvScreenMat.emissiveIntensity = .35 + Math.random()*.35;
+  lavaLight.intensity = 22 + Math.sin(t*.7)*6; if (lavaMat) lavaMat.emissiveIntensity = .7 + Math.sin(t*.7)*.3;
+  if (cjAttach.cj_hand && cjAttach.cj_mouth) {
+    cjAttach.cj_hand.getWorldPosition(cjHandW); cjAttach.cj_mouth.getWorldPosition(cjMouthW);
+    cjBlunt.position.copy(cjHandW); cjBlunt.lookAt(cjMouthW); cjBlunt.rotateY(Math.PI/2); // x axis points away from the mouth
+    cjBlunt.rotateY(Math.PI);
+    cjBlunt.userData.ember.getWorldPosition(cjEmberW);
+    const cjHit = Math.max(0, Math.sin(t*.45)) ** 6;   // a slow rhythm of hits
+    cjBlunt.userData.light.intensity = .6 + cjHit*4 + torch*3;
+    if (Math.random() < .25 + cjHit) emit(smoke, cjEmberW.x, cjEmberW.y+.03, cjEmberW.z, (Math.random()-.5)*.06, .18+Math.random()*.12, (Math.random()-.5)*.06, 1.4+Math.random(), .8,.72,.68);
+    const exhale = Math.max(0, Math.sin(t*.45 - 1.2)) ** 8 * 3 + torch*2;
+    for (let k=0;k<exhale;k++) emit(smoke, cjMouthW.x, cjMouthW.y, cjMouthW.z, (Math.random()-.5)*.1, .22+Math.random()*.15, (Math.random()-.5)*.1 - .12, 1.8+Math.random()*1.2, .85,.8,.78);
+    if (cjMesh) cjMesh.rotation.x = cjMesh.userData.rx ?? (cjMesh.userData.rx = cjMesh.rotation.x), cjMesh.rotation.x = cjMesh.userData.rx + Math.sin(t*1.1)*.012 + listen*.03*Math.sin(t*9);
+  }
+
+  controls.update();
+  composer.render();
+  brainRenderer.render(brainScene, brainCam);
+}
+animate();
+if (location.search.includes("demo")) { dose = doseTarget = 1; torch = 1; showPhrase(PHRASES[0]); for (let k=0;k<3;k++) btn.click(); }
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(psxW(), psxH(), false); composer.setSize(psxW(), psxH()); ditherPass.uniforms.res.value.set(psxW(), psxH());
+  sizeBrain();
+});
+</script>
+</body>
+</html>
